@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>黄沙边镇 · Yellow Sand Gulch — 体素西部小镇</title>
+<style>
+  :root{
+    --bg:#12100e; --panel:rgba(24,19,15,.82); --line:rgba(214,168,104,.28);
+    --ink:#f2e3c8; --ink-dim:#c7b393; --accent:#e8a44c; --accent2:#c9662f;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; height:100%; overflow:hidden; background:var(--bg);
+    font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif; color:var(--ink); }
+  #scene{ position:fixed; inset:0; width:100vw; height:100vh; display:block; touch-action:none; cursor:grab; }
+  #scene:active{ cursor:grabbing; }
+
+  #hud{ position:fixed; inset:0; pointer-events:none; }
+  #hud > *{ pointer-events:auto; }
+
+  /* 标题 */
+  #title{ position:absolute; left:22px; top:20px; padding:12px 18px 12px 16px;
+    background:linear-gradient(135deg,rgba(26,20,15,.86),rgba(38,27,18,.62));
+    border-left:3px solid var(--accent); border-radius:3px; backdrop-filter:blur(6px);
+    box-shadow:0 10px 30px rgba(0,0,0,.35); }
+  #title h1{ margin:0; font-size:23px; letter-spacing:5px; font-weight:600; }
+  #title h1 em{ font-style:normal; color:var(--accent); }
+  #title p{ margin:5px 0 0; font-size:11.5px; letter-spacing:2.2px; color:var(--ink-dim); text-transform:uppercase; }
+  #title .meta{ margin-top:8px; font-size:11px; color:#a8937a; letter-spacing:.5px; }
+
+  /* 时钟 */
+  #clockBox{ position:absolute; right:22px; top:20px; text-align:right;
+    background:linear-gradient(135deg,rgba(26,20,15,.86),rgba(38,27,18,.55));
+    border-right:3px solid var(--accent); border-radius:3px; padding:12px 16px; backdrop-filter:blur(6px); }
+  #clockText{ font-size:38px; line-height:1; letter-spacing:3px; font-variant-numeric:tabular-nums;
+    color:#fff2d8; text-shadow:0 2px 18px rgba(255,180,90,.35); }
+  #phaseText{ margin-top:6px; font-size:12px; letter-spacing:4px; color:var(--accent); }
+  #fpsText{ margin-top:7px; font-size:10.5px; letter-spacing:1px; color:#9c876d; }
+
+  /* 控制面板 */
+  #panel{ position:absolute; left:50%; transform:translateX(-50%); bottom:20px;
+    width:min(880px,calc(100vw - 40px)); padding:14px 18px 12px;
+    background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    backdrop-filter:blur(10px); box-shadow:0 18px 50px rgba(0,0,0,.5); }
+  .row{ display:flex; align-items:center; gap:12px; }
+  .row + .row{ margin-top:10px; }
+  .label{ font-size:11px; letter-spacing:2px; color:var(--ink-dim); white-space:nowrap; min-width:66px; }
+  button{ font-family:inherit; color:var(--ink); background:rgba(255,255,255,.06);
+    border:1px solid var(--line); border-radius:5px; padding:7px 13px; font-size:12.5px;
+    letter-spacing:1.5px; cursor:pointer; transition:.18s; white-space:nowrap; }
+  button:hover{ background:rgba(232,164,76,.22); border-color:var(--accent); }
+  button.primary{ background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#241505; font-weight:600; border-color:transparent; }
+  button.primary:hover{ filter:brightness(1.1); }
+  button.paused{ background:rgba(232,164,76,.28); }
+  button.active{ background:var(--accent); color:#241505; }
+  input[type=range]{ -webkit-appearance:none; appearance:none; height:5px; border-radius:4px;
+    background:linear-gradient(90deg,var(--accent2),var(--accent)); outline:none; flex:1; }
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none; width:17px; height:17px;
+    border-radius:50%; background:#fff1d8; border:2px solid var(--accent2); cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.4); }
+  input[type=range]::-moz-range-thumb{ width:17px; height:17px; border-radius:50%;
+    background:#fff1d8; border:2px solid var(--accent2); cursor:pointer; }
+  #timeSlider{ flex:1.6; }
+  .val{ font-size:12px; color:var(--accent); min-width:56px; text-align:right; font-variant-numeric:tabular-nums; }
+  #presets{ display:flex; gap:8px; flex-wrap:wrap; }
+  #presets button{ padding:6px 12px; font-size:12px; }
+
+  /* 帮助 */
+  #helpPanel{ position:absolute; left:50%; top:50%; transform:translate(-50%,-48%) scale(.97);
+    width:min(720px,calc(100vw - 44px)); max-height:78vh; overflow:auto;
+    background:rgba(20,15,11,.95); border:1px solid var(--line); border-radius:10px;
+    padding:26px 30px; opacity:0; visibility:hidden; transition:.22s; box-shadow:0 30px 90px rgba(0,0,0,.65); }
+  #helpPanel.open{ opacity:1; visibility:visible; transform:translate(-50%,-50%) scale(1); }
+  #helpPanel h2{ margin:0 0 4px; font-size:19px; letter-spacing:3px; color:var(--accent); }
+  #helpPanel .sub{ font-size:11.5px; color:var(--ink-dim); letter-spacing:1.5px; margin-bottom:16px; }
+  #helpPanel h3{ margin:18px 0 8px; font-size:13px; letter-spacing:2.5px; color:#f0d9b0;
+    border-left:3px solid var(--accent2); padding-left:9px; }
+  #helpPanel table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  #helpPanel td{ padding:5px 8px; border-bottom:1px solid rgba(214,168,104,.13); vertical-align:top; }
+  #helpPanel td:first-child{ color:var(--accent); white-space:nowrap; width:150px; letter-spacing:1px; }
+  #helpPanel p{ font-size:12.5px; line-height:1.85; color:#d8c5a5; margin:8px 0; }
+
+  /* 提示条 */
+  #hint{ position:absolute; left:22px; bottom:132px; font-size:11px; letter-spacing:1.6px;
+    color:rgba(226,203,168,.62); line-height:1.9; }
+  #hint b{ color:var(--accent); font-weight:600; }
+  #status{ position:absolute; left:-9999px; top:-9999px; }
+
+  /* 载入 */
+  #loading{ position:fixed; inset:0; background:radial-gradient(ellipse at 50% 40%,#2a1d12,#12100e 70%);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    z-index:50; }
+  #loading.hide{ opacity:0; pointer-events:none; transition:opacity .32s; }
+  #loading h1{ font-size:26px; letter-spacing:11px; margin:0 0 10px; color:#f0d9b0; }
+  #loading .bar{ width:240px; height:3px; background:rgba(255,255,255,.12); border-radius:3px; overflow:hidden; margin-top:18px; }
+  #loading .bar i{ display:block; height:100%; width:38%; background:linear-gradient(90deg,var(--accent2),var(--accent));
+    animation:run 1.25s ease-in-out infinite; }
+  #loading p{ font-size:11.5px; letter-spacing:3.5px; color:#a8937a; margin:14px 0 0; }
+  @keyframes run{ 0%{ transform:translateX(-110%);} 100%{ transform:translateX(300%);} }
+
+  @media (max-width:720px){
+    #title h1{ font-size:17px; letter-spacing:3px; }
+    #title p{ font-size:9.5px; letter-spacing:1.4px; }
+    #clockText{ font-size:26px; }
+    #hint{ display:none; }
+    .label{ min-width:52px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div id="loading">
+  <h1>黄沙边镇</h1>
+  <p>正在铺开荒漠 · 红岩峡谷 · 木制主街</p>
+  <div class="bar"><i></i></div>
+</div>
+
+<div id="hud">
+  <div id="title">
+    <h1>黄<em>沙</em>边镇</h1>
+    <p>Yellow Sand Gulch · Voxel Wild West</p>
+    <div class="meta" id="metaLine">0.2m / voxel · 昼夜循环 · 19世纪西部</div>
+  </div>
+
+  <div id="clockBox">
+    <div id="clockText">06:24</div>
+    <div id="phaseText">黎明</div>
+    <div id="fpsText">— FPS</div>
+  </div>
+
+  <div id="panel">
+    <div class="row">
+      <button id="playBtn" class="primary">⏸ 暂停</button>
+      <span class="label">时间轴</span>
+      <input id="timeSlider" type="range" min="0" max="24" step="0.01" value="6.4">
+      <span class="val" id="timeVal">06:24</span>
+    </div>
+    <div class="row">
+      <span class="label">昼夜速度</span>
+      <input id="speedSlider" type="range" min="0" max="4" step="1" value="2">
+      <span class="val" id="speedLabel">1天/5分钟</span>
+      <button id="tourBtn">▶ 自动游览</button>
+      <button id="resetBtn">复位视角</button>
+      <button id="helpBtn">操作说明</button>
+    </div>
+    <div class="row">
+      <span class="label">时段预设</span>
+      <div id="presets"></div>
+    </div>
+  </div>
+
+  <div id="hint">
+    <b>左键拖拽</b> 环绕视角 &nbsp;·&nbsp; <b>右键拖拽</b> 平移 &nbsp;·&nbsp; <b>滚轮</b> 推拉<br>
+    <b>W A S D</b> 飞行 &nbsp;·&nbsp; <b>Q / E</b> 升降 &nbsp;·&nbsp; <b>Shift</b> 加速 &nbsp;·&nbsp; <b>空格</b> 暂停昼夜 &nbsp;·&nbsp; <b>T</b> 自动游览
+  </div>
+
+  <div id="helpPanel">
+    <h2>操作说明</h2>
+    <div class="sub">黄沙边镇 · 单文件离线体素场景 · 0.2 米 / 体素</div>
+
+    <h3>视角游览</h3>
+    <table>
+      <tr><td>左键拖拽</td><td>环绕视角（绕焦点旋转）</td></tr>
+      <tr><td>右键拖拽</td><td>平移视点</td></tr>
+      <tr><td>滚轮</td><td>推近 / 拉远</td></tr>
+      <tr><td>W / A / S / D / 方向键</td><td>前后左右移动视点</td></tr>
+      <tr><td>Q / E</td><td>视点下降 / 上升</td></tr>
+      <tr><td>Shift</td><td>加速移动（长按）</td></tr>
+      <tr><td>R</td><td>复位到主街观景位</td></tr>
+      <tr><td>T 或「自动游览」</td><td>沿主街 → 铁路 → 峡谷水塔 → 钟楼 → 山道 → 瞭望台 连续飞行；任意操作即退出</td></tr>
+    </table>
+
+    <h3>昼夜循环（24 小时连续）</h3>
+    <table>
+      <tr><td>自动推进</td><td>默认开启，日月升落、天空、光照与小镇灯火随之连续变化</td></tr>
+      <tr><td>时间轴滑杆</td><td>按住拖动即可手动调节到任意时刻（0:00 – 24:00）</td></tr>
+      <tr><td>昼夜速度</td><td>1 天 = 45 秒 / 2 分 / 5 分 / 15 分 / 40 分</td></tr>
+      <tr><td>⏸ 暂停 / ▶ 继续</td><td>暂停或恢复时间流动；也可按<b>空格</b></td></tr>
+      <tr><td>[ 与 ]</td><td>时间回退 / 前进 30 分钟</td></tr>
+      <tr><td>数字键 1 – 5</td><td>黎明 / 上午 / 正午 / 黄昏 / 深夜</td></tr>
+    </table>
+
+    <h3>场景看点</h3>
+    <p>主街两侧：沙龙、旅馆、杂货铺、警长办公室、监狱、银行、理发店；南侧有教堂尖塔、马厩、铁匠铺、学校与邮局。
+       峡谷岩壁旁矗立<b>标志性水塔与钟楼</b>（钟楼指针随真实时间转动），铁路上有往返的<b>蒸汽机车</b>、火车站与水塔，
+       风车在荒漠边缘转动，山道折返而上抵达<b>山顶瞭望台</b>。营火、风滚草、马车、仙人掌与木栅栏散布其间。
+       夜幕降临时窗棂、街灯、车灯与营火次第亮起，星空浮现。</p>
+    <h3>技术说明</h3>
+    <p>全部几何为 0.2 米体素，程序化生成并做面剔除与环境光遮蔽；单文件离线运行，无需联网与任何外部资源。</p>
+    <div class="row" style="margin-top:18px; justify-content:flex-end;">
+      <button id="helpClose" class="primary">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div id="status">BOOT</div>
+
+<script>
+/*__THREE__*/
+</script>
+<script>
+/*__APP__*/
+</script>
+<script>
+(function(){
+  var load = document.getElementById('loading');
+  var hide = function(){ if (load) load.classList.add('hide'); };
+  if (document.readyState === 'complete') setTimeout(hide, 260);
+  else window.addEventListener('load', function(){ setTimeout(hide, 260); });
+  // 时间显示与滑杆联动
+  var ts = document.getElementById('timeSlider');
+  var tv = document.getElementById('timeVal');
+  if (ts && tv){
+    var pad = function(n){ return (n < 10 ? '0' : '') + n; };
+    var upd = function(){
+      var h = parseFloat(ts.value);
+      tv.textContent = pad(Math.floor(h) % 24) + ':' + pad(Math.floor((h % 1) * 60));
+    };
+    ts.addEventListener('input', upd);
+    setInterval(upd, 250);
+  }
+})();
+</script>
+</body>
+</html>
